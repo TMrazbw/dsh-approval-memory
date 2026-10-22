@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DAM approval memory">
+  <rect width="64" height="64" rx="14" fill="#123B3A"/>
+  <path d="M32 9l17 6v15c0 11-7.5 19-17 24-9.5-5-17-13-17-24V15l17-6z" fill="#F4FAF7"/>
+  <path d="M22 24h11M22 30h11M22 36h6" stroke="#123B3A" stroke-width="3" stroke-linecap="round"/>
+  <path d="M35 38l4 4 8-10" fill="none" stroke="#0E9F8A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

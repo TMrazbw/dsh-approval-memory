@@ -1,0 +1,9 @@
+node_modules/
+PROJECT.md
+PROGRESS.md
+failure-reports/
+*.log
+github-token*
+.env
+.DS_Store
+coverage/

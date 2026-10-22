@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DAM Approval Memory",
+    "description": "Records and classifies DSH approval requests with operation, actual count, and risk, and auto-approves read-only classes under user-defined rules."
+  }
+}
