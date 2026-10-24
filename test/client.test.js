@@ -43,7 +43,7 @@ function snapshot() {
     dataRoot: 'C:/dam-data',
     ok: true,
     degraded: false,
-    totals: { classes: 1, requests: 3, auto: 1 },
+    totals: { classes: 3, requests: 5, auto: 1 },
     classes: [{
       key: 'plugin_manager:list_bundles',
       titleZh: '插件管理：列出 Bundle',
@@ -54,6 +54,26 @@ function snapshot() {
       firstSeenAt: now - 10000,
       lastSeenAt: now - 1000,
       examples: ['example reason'],
+    }, {
+      key: 'plugin_manager:install_bundle',
+      titleZh: '插件管理：安装 Bundle',
+      titleEn: 'Plugin Manager: install bundle',
+      operation: 'write',
+      risk: { level: 'high', reasonZh: '高风险', reasonEn: 'high risk', policyId: 'install' },
+      counts: { total: 1, allowed: 1, rejected: 0, auto: 0, cancelledOrUnavailable: 0 },
+      firstSeenAt: now - 9000,
+      lastSeenAt: now - 2000,
+      examples: [],
+    }, {
+      key: 'plugin_manager:set_version_exemption',
+      titleZh: '插件管理：设置版本豁免',
+      titleEn: 'Plugin Manager: set version exemption',
+      operation: 'write',
+      risk: { level: 'low', reasonZh: '黑名单类', reasonEn: 'blacklisted', policyId: 'blacklist' },
+      counts: { total: 1, allowed: 1, rejected: 0, auto: 0, cancelledOrUnavailable: 0 },
+      firstSeenAt: now - 8000,
+      lastSeenAt: now - 3000,
+      examples: [],
     }],
     rules: [{ classKey: 'plugin_manager:list_bundles', enabled: true, updatedAt: now, source: 'ui' }],
     blacklist: [{ key: 'plugin_manager:set_version_exemption', reasonZh: '禁止', reasonEn: 'forbidden' }],
@@ -191,6 +211,18 @@ test('the panel renders summary, classes, blacklist, and auto-approval log', () 
   assert.ok(findText(tree, '黑名单（只读）'));
   assert.ok(findText(tree, '自动同意记录'));
   assert.ok(findText(tree, 'C:/dam-data'));
+});
+
+test('the main table lists only observed classes that can be auto-approved', () => {
+  const harness = createHarness({ snapshot: snapshot() });
+  const Panel = harness.registered.get('main');
+  const tree = Panel();
+  assert.equal(findText(tree, '插件管理：安装 Bundle'), false);
+  assert.equal(findText(tree, '插件管理：设置版本豁免'), false);
+  assert.equal(findText(tree, 'plugin_manager:install_bundle'), false);
+  assert.ok(findText(tree, '另有 2 个已出现类不可自动同意'));
+  assert.ok(findText(tree, '可同意请求类'));
+  assert.ok(findText(tree, '插件管理：列出 Bundle'));
 });
 
 test('the panel can return to the conversation and labels its rule reset clearly', () => {

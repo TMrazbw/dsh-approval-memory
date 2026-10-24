@@ -278,11 +278,17 @@ window.__ModuleLoader__.load({
         .slice(-10)
         .reverse();
 
-      const operations = [...new Set(classes.map((cls) => cls.operation))]
+      function canToggle(cls) {
+        return cls.risk?.level === 'low' && !blacklistKeys.has(cls.key);
+      }
+
+      const toggleableClasses = classes.filter((cls) => canToggle(cls));
+      const statsOnlyCount = classes.length - toggleableClasses.length;
+      const operations = [...new Set(toggleableClasses.map((cls) => cls.operation))]
         .filter((value) => typeof value === 'string')
         .sort();
 
-      const visible = classes.filter((cls) => {
+      const visible = toggleableClasses.filter((cls) => {
         const title = `${cls.titleZh || ''} ${cls.titleEn || ''} ${cls.key}`.toLowerCase();
         if (search.trim().length > 0 && !title.includes(search.trim().toLowerCase())) return false;
         if (risk !== 'all' && cls.risk?.level !== risk) return false;
@@ -290,10 +296,6 @@ window.__ModuleLoader__.load({
         if (onlyRepeated && (Number(cls.counts?.total) || 0) < 2) return false;
         return true;
       });
-
-      function canToggle(cls) {
-        return cls.risk?.level === 'low' && !blacklistKeys.has(cls.key);
-      }
 
       function enabled(cls) {
         const rule = rulesByKey.get(cls.key);
@@ -397,12 +399,16 @@ window.__ModuleLoader__.load({
           h('div', { style: styles.grid },
             card(t('请求总数', 'Requests'), String(snapshot.totals?.requests ?? 0)),
             card(t('自动同意', 'Auto-approved'), String(snapshot.totals?.auto ?? 0)),
-            card(t('请求类', 'Request classes'), String(snapshot.totals?.classes ?? 0)),
+            card(t('可同意请求类', 'Toggleable classes'), String(toggleableClasses.length)),
             card(t('生效规则', 'Active rules'), String(activeRules))),
           snapshot.classes.length === 0 ? h('div', { style: styles.empty }, t(
             '还没有审批记录。出现审批请求后，这里会自动新增请求类。',
             'No approvals recorded yet. Request classes appear here as they occur.',
           )) : h('div', null,
+            statsOnlyCount > 0 ? h('p', { style: styles.muted }, t(
+              `另有 ${statsOnlyCount} 个已出现类不可自动同意，仅计入总数，不在本表显示。`,
+              `${statsOnlyCount} observed class(es) cannot be auto-approved; they are counted but not listed here.`,
+            )) : null,
             h('div', { style: styles.filters },
               h('input', {
                 type: 'search',
@@ -438,7 +444,7 @@ window.__ModuleLoader__.load({
             h('div', { style: styles.tableScroll },
               h('table', { style: styles.table },
                 h('thead', null, h('tr', null,
-                  ...[t('请求类', 'Request class'), t('操作', 'Operation'), t('实际次数', 'Actual count'),
+                  ...[t('可同意请求类', 'Toggleable class'), t('操作', 'Operation'), t('实际次数', 'Actual count'),
                     t('风险', 'Risk'), t('自动同意', 'Auto-approve'), t('最近出现', 'Last seen')]
                     .map((label) => h('th', { key: label, style: styles.th }, label)))),
                 h('tbody', null, ...visible.map((cls) => h('tr', { key: cls.key },
@@ -458,7 +464,7 @@ window.__ModuleLoader__.load({
                     blacklistKeys.has(cls.key) ? h('div', { style: styles.cellMeta }, t('黑名单', 'Blacklisted')) : null),
                   h('td', { style: styles.td }, switchFor(cls)),
                   h('td', { style: styles.td }, formatRelative(cls.lastSeenAt)))))),
-            visible.length === 0 ? h('p', { style: styles.muted }, t('没有匹配的请求类。', 'No matching request classes.')) : null)),
+            visible.length === 0 ? h('p', { style: styles.muted }, t('没有匹配的可自动同意请求类。', 'No matching toggleable request classes.')) : null)),
           h('section', { style: styles.section },
             h('h2', { style: styles.sectionTitle },
               t('黑名单（只读）', 'Blacklist (read-only)'),

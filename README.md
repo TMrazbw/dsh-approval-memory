@@ -50,7 +50,9 @@ After installation:
 
 - Open **自动同意请求** from the left sidebar, or type `/dam-ui`.
 - Say “我要看 DAM 的界面” / “open the DAM UI”; the agent can call `open_dam_ui`.
-- The panel shows only request classes that actually occurred.
+- The panel shows only request classes that actually occurred **and can be auto-approved**.
+- Classes that cannot be auto-approved (blacklist, medium/high/unknown risk) are counted but
+  are not listed in the toggle table; the blacklist has its own read-only section.
 - Use the switch to enable or disable auto-approval for a low-risk read-only class.
 - **关闭全部自动同意** disables every known rule; it does not close the panel.
 - **返回对话** closes the panel and returns to the conversation.
@@ -119,7 +121,7 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **106 tests**, covering classification, extraction, redaction, storage,
+Current test suite: **107 tests**, covering classification, extraction, redaction, storage,
 Host runtime, data bridge, Client registration, and integration flows.
 
 ```text
@@ -134,7 +136,7 @@ lib/
   host.js           approval runtime
   open-tool.js      plain ToolDefinition for open_dam_ui
   bridge.js         authenticated snapshot/mutate routes
-test/               106 Node tests
+test/               107 Node tests
 locale/             en / zh display metadata
 ```
 
