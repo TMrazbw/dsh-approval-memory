@@ -858,7 +858,7 @@ window.__ModuleLoader__.load({
           name: 'dam-ui',
           available: () => true,
           label: () => 'DAM-UI',
-          description: () => t('打开 DAM 审批记忆面板', 'Open the DAM approval-memory panel'),
+          description: () => t('打开自动同意请求面板', 'Open the DAM approval-memory panel'),
           icon: PanelIcon,
           ui: {
             kind: 'action',

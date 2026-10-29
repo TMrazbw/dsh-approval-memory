@@ -112,7 +112,7 @@ export function apply(ctx, config = {}) {
     scope.effect(() => scope.systemPrompt.section({
       name: 'dam:open-ui',
       order: 1450,
-      text: 'When the user asks to see, open, or show the DAM approval-memory UI (DAM 审批记忆 / DAM-UI), call `open_dam_ui`. Do not only describe how to open it.',
+      text: 'When the user asks to see, open, or show the DAM approval-memory UI (自动同意请求 / DAM-UI), call `open_dam_ui`. Do not only describe how to open it.',
     }));
   });
 }
