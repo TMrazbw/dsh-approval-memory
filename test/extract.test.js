@@ -23,7 +23,7 @@ const EVENTS = [
     data: {
       callId: 'call-shell',
       name: 'bash',
-      arguments: '{"sandbox_permissions":"workspace-write","command":"Get-ChildItem"}',
+      arguments: '{"sandbox_permissions":"workspace-write","command":"Get-ChildItem","cwd":"C:\\\\work"}',
     },
   },
   {
@@ -31,7 +31,7 @@ const EVENTS = [
     data: {
       callId: 'call-shell',
       name: 'bash',
-      arguments: '{"sandbox_permissions":"danger-full-access","command":"Get-ChildItem"}',
+      arguments: '{"sandbox_permissions":"danger-full-access","command":"Get-ChildItem","cwd":"C:\\\\work"}',
     },
   },
 ];
@@ -142,6 +142,17 @@ test('extractRequest recovers a shell requested mode from the reason', () => {
   assert.equal(request.requestedMode, 'workspace-write');
 });
 
+test('extractRequest returns shell command and cwd', () => {
+  const request = extractRequest({
+    toolName: 'bash',
+    callId: 'call-shell',
+    events: EVENTS,
+  });
+  assert.equal(request.command, 'Get-ChildItem');
+  assert.equal(request.cwd, 'C:\\work');
+  assert.equal(request.commandSource, 'tool_call');
+});
+
 test('extractRequest returns empty fields when nothing can be resolved', () => {
   const request = extractRequest({ toolName: 'unknown', callId: null, reason: null, events: [] });
   assert.equal(request.source, 'none');
@@ -149,6 +160,9 @@ test('extractRequest returns empty fields when nothing can be resolved', () => {
   assert.equal(request.requestedMode, null);
   assert.equal(request.args, null);
   assert.equal(request.argumentsText, null);
+  assert.equal(request.command, null);
+  assert.equal(request.cwd, null);
+  assert.equal(request.commandSource, 'none');
 });
 
 test('extractRequest exposes a run_code inner tool when present', () => {

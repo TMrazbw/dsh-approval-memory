@@ -240,6 +240,8 @@ window.__ModuleLoader__.load({
       const [risk, setRisk] = useState('all');
       const [operation, setOperation] = useState('all');
       const [onlyRepeated, setOnlyRepeated] = useState(false);
+      const [riskTagFilter, setRiskTagFilter] = useState('all');
+      const [onlyTagged, setOnlyTagged] = useState(false);
 
       async function load(options = {}) {
         const silent = options.silent === true;
@@ -296,6 +298,29 @@ window.__ModuleLoader__.load({
         if (onlyRepeated && (Number(cls.counts?.total) || 0) < 2) return false;
         return true;
       });
+
+      const riskClasses = classes.filter((cls) => !canToggle(cls) && !blacklistKeys.has(cls.key));
+      const riskTagOptions = [...new Set(riskClasses.flatMap((cls) => Object.keys(cls.riskTags ?? {})))]
+        .sort();
+      const visibleRisk = riskClasses.filter((cls) => {
+        const tags = Object.keys(cls.riskTags ?? {});
+        if (riskTagFilter !== 'all' && !tags.includes(riskTagFilter)) return false;
+        if (onlyTagged && tags.length === 0) return false;
+        return true;
+      });
+      const latestAskedByClass = new Map();
+      for (const event of snapshot?.recentEvents ?? []) {
+        if (event.type === 'asked' && typeof event.classKey === 'string') {
+          latestAskedByClass.set(event.classKey, event);
+        }
+      }
+      const highRiskRequests = riskClasses.reduce((sum, cls) => (
+        cls.riskLevelHint === 'high' ? sum + (Number(cls.counts?.total) || 0) : sum
+      ), 0);
+      const autoSuccess = classes.reduce((sum, cls) => sum + (Number(cls.autoResults?.success) || 0), 0);
+      const autoError = classes.reduce((sum, cls) => sum + (Number(cls.autoResults?.error) || 0), 0);
+      const autoTotal = Number(snapshot?.totals?.auto) || 0;
+      const autoNoResult = Math.max(0, autoTotal - autoSuccess - autoError);
 
       function enabled(cls) {
         const rule = rulesByKey.get(cls.key);
@@ -364,6 +389,59 @@ window.__ModuleLoader__.load({
         });
       }
 
+      function rejectionText(cls) {
+        const rejection = cls?.rejection;
+        if (rejection === null || typeof rejection !== 'object') return null;
+        const count = Number(rejection.count);
+        if (!Number.isFinite(count) || count <= 0) return null;
+        return t(
+          `保留审计中曾被拒绝 ${count} 次，最近 ${formatTime(rejection.lastRejectedAt)}`,
+          `Rejected ${count} time(s) in retained audit; latest ${formatTime(rejection.lastRejectedAt)}`,
+        );
+      }
+
+      function riskRow(cls) {
+        const tags = Object.entries(cls.riskTags ?? {})
+          .filter(([tag]) => typeof tag === 'string' && tag.length > 0)
+          .slice(0, 8);
+        const latest = latestAskedByClass.get(cls.key);
+        const command = (cls.commandExamples ?? [])[0]
+          ?? (typeof latest?.commandPreview === 'string' ? latest.commandPreview : null);
+        const cwd = typeof latest?.commandCwd === 'string' ? latest.commandCwd : null;
+        const targets = Array.isArray(latest?.commandTargets) ? latest.commandTargets : [];
+
+        return h('div', { key: cls.key, style: styles.riskRow },
+          h('div', { style: styles.riskRowHead },
+            h('div', null,
+              h('div', { style: styles.cellTitle }, classTitle(cls)),
+              h('div', { style: styles.cellMeta }, cls.key)),
+            h('div', { style: styles.cellMeta },
+              h('span', { style: { color: riskColor(cls.riskLevelHint), fontWeight: 500 } },
+                riskLabel(cls.riskLevelHint)),
+              ` · ${formatCounts(cls.counts)}`)),
+          tags.length > 0
+            ? h('div', { style: styles.riskTags }, ...tags.map(([tag, count]) => h('span', {
+              key: `${cls.key}:${tag}`,
+              style: styles.riskTag,
+            }, `${tag} ×${count}`)))
+            : h('div', { style: styles.cellMeta }, t('暂无风险标签', 'No risk tags')),
+          command !== null
+            ? h('pre', { style: styles.riskCommand }, command)
+            : h('div', { style: styles.cellMeta }, t(
+              '未获取到命令（callId 缺失或参数不可读）',
+              'No command available (missing callId or unreadable arguments)',
+            )),
+          cwd !== null ? h('div', { style: styles.cellMeta }, `${t('目录：', 'Cwd: ')}${cwd}`) : null,
+          targets.length > 0
+            ? h('div', { style: styles.cellMeta }, `${t('命中目标：', 'Targets: ')}${targets.join(', ')}`)
+            : null,
+          rejectionText(cls) ? h('div', { style: styles.rejection }, rejectionText(cls)) : null,
+          h('div', { style: styles.cellMeta }, t(
+            '静态模式匹配，不是安全保证；不参与自动同意判定。',
+            'Static pattern match, not a guarantee; never part of the approval decision.',
+          )));
+      }
+
       return h('div', { style: styles.page },
         h('header', { style: styles.header },
           h('div', null,
@@ -401,6 +479,10 @@ window.__ModuleLoader__.load({
             card(t('自动同意', 'Auto-approved'), String(snapshot.totals?.auto ?? 0)),
             card(t('可同意请求类', 'Toggleable classes'), String(toggleableClasses.length)),
             card(t('生效规则', 'Active rules'), String(activeRules))),
+          highRiskRequests > 0 ? h('p', { style: styles.muted }, t(
+            `含高危模式的请求 ${highRiskRequests} 次（仅统计，不参与自动同意）。`,
+            `${highRiskRequests} request(s) with high-risk patterns (statistics only, never auto-approved).`,
+          )) : null,
           snapshot.classes.length === 0 ? h('div', { style: styles.empty }, t(
             '还没有审批记录。出现审批请求后，这里会自动新增请求类。',
             'No approvals recorded yet. Request classes appear here as they occur.',
@@ -455,7 +537,8 @@ window.__ModuleLoader__.load({
                     (cls.examples ?? []).slice(0, 1).map((example) => h('div', {
                       key: `${cls.key}:example`,
                       style: styles.cellMeta,
-                    }, example))),
+                    }, example)),
+                    rejectionText(cls) ? h('div', { style: styles.rejection }, rejectionText(cls)) : null),
                   h('td', { style: styles.td }, operationLabel(cls.operation)),
                   h('td', { style: styles.td }, formatCounts(cls.counts)),
                   h('td', { style: styles.td },
@@ -465,6 +548,40 @@ window.__ModuleLoader__.load({
                   h('td', { style: styles.td }, switchFor(cls)),
                   h('td', { style: styles.td }, formatRelative(cls.lastSeenAt)))))),
             visible.length === 0 ? h('p', { style: styles.muted }, t('没有匹配的可自动同意请求类。', 'No matching toggleable request classes.')) : null)),
+          riskClasses.length > 0 ? h('details', { style: styles.riskSection },
+            h('summary', { style: styles.riskSummary },
+              h('span', null,
+                t('仅统计 / 不可自动同意', 'Statistics only / no auto-approval'),
+                h('span', { style: styles.riskBadge }, String(riskClasses.length)),
+                highRiskRequests > 0
+                  ? h('span', { style: styles.riskBadge }, t(`高危 ${highRiskRequests} 次`, `${highRiskRequests} high-risk`))
+                  : null),
+              h('span', { style: styles.muted }, t('展开查看命令风险', 'Expand for command risk'))),
+            h('div', { style: styles.riskBody },
+              h('p', { style: styles.muted }, t(
+                '这些请求类不能自动同意；风险标签只用于展示，不参与自动同意判定。',
+                'These classes cannot be auto-approved; risk tags are display-only and never affect the decision.',
+              )),
+              h('div', { style: styles.riskFilters },
+                h('select', {
+                  value: riskTagFilter,
+                  'aria-label': t('风险标签筛选', 'Risk tag filter'),
+                  onChange: (event) => setRiskTagFilter(event.target.value),
+                  style: styles.select,
+                },
+                h('option', { value: 'all' }, t('全部风险标签', 'All risk tags')),
+                ...riskTagOptions.map((tag) => h('option', { key: tag, value: tag }, tag))),
+                h('label', { style: styles.checkLabel },
+                  h('input', {
+                    type: 'checkbox',
+                    checked: onlyTagged,
+                    onChange: (event) => setOnlyTagged(event.target.checked),
+                  }),
+                  t('只看有标签', 'Tagged only'))),
+              ...visibleRisk.map(riskRow),
+              visibleRisk.length === 0
+                ? h('p', { style: styles.muted }, t('没有匹配的风险类。', 'No matching risk classes.'))
+                : null)) : null,
           h('section', { style: styles.section },
             h('h2', { style: styles.sectionTitle },
               t('黑名单（只读）', 'Blacklist (read-only)'),
@@ -478,6 +595,10 @@ window.__ModuleLoader__.load({
               h('span', { style: styles.cellMeta }, t(row.reasonZh, row.reasonEn))))),
           h('section', { style: styles.section },
             h('h2', { style: styles.sectionTitle }, t('自动同意记录', 'Auto-approval log')),
+            autoTotal > 0 ? h('p', { style: styles.muted }, t(
+              `自动同意结果（近似）：成功 ${autoSuccess} / 失败 ${autoError} / 未执行 ${autoNoResult}`,
+              `Auto-approval results (approximate): ok ${autoSuccess} / error ${autoError} / no-result ${autoNoResult}`,
+            )) : null,
             autoEvents.length === 0
               ? h('p', { style: styles.muted }, t('暂无自动同意。', 'No auto approvals yet.'))
               : autoEvents.map((event, index) => h('div', {
@@ -627,6 +748,76 @@ window.__ModuleLoader__.load({
         wordBreak: 'break-all',
       },
       section: { marginTop: '18px' },
+      riskSection: {
+        marginTop: '16px',
+        padding: '0 12px',
+        border: '1px solid var(--dsw-alias-border-l1)',
+        borderRadius: '8px',
+        background: 'var(--dsw-alias-bg-layer-1)',
+      },
+      riskSummary: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px',
+        padding: '10px 0',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: 600,
+      },
+      riskBadge: {
+        marginLeft: '8px',
+        color: 'var(--dsw-alias-label-secondary)',
+        fontSize: '11px',
+        fontWeight: 500,
+      },
+      riskBody: { padding: '0 0 10px' },
+      riskFilters: {
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '8px',
+        marginBottom: '10px',
+      },
+      riskRow: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '5px',
+        padding: '10px 0',
+        borderTop: '1px solid var(--dsw-alias-border-l1)',
+      },
+      riskRowHead: {
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '10px',
+      },
+      riskTags: { display: 'flex', flexWrap: 'wrap', gap: '4px' },
+      riskTag: {
+        padding: '1px 6px',
+        border: '1px solid var(--dsw-alias-border-l1)',
+        borderRadius: '999px',
+        color: 'var(--dsw-alias-label-secondary)',
+        fontSize: '10px',
+      },
+      riskCommand: {
+        margin: '0',
+        padding: '6px 8px',
+        border: '1px solid var(--dsw-alias-border-l1)',
+        borderRadius: '6px',
+        background: 'var(--dsw-alias-bg-base)',
+        color: 'var(--dsw-alias-label-primary)',
+        fontFamily: 'var(--ds-font-family-code)',
+        fontSize: '11px',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
+      },
+      rejection: {
+        color: 'var(--dsw-alias-state-warn-primary)',
+        fontSize: '11px',
+        lineHeight: 1.5,
+      },
       sectionTitle: { margin: '0 0 8px', fontSize: '14px', fontWeight: 600 },
       sectionBadge: {
         marginLeft: '8px',

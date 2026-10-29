@@ -27,11 +27,11 @@ test('init creates the file layout and starts empty', async () => {
     const result = await store.init();
     assert.equal(result.ok, true);
     assert.deepEqual(await readFile(path.join(root, 'classes.json'), 'utf8').then(JSON.parse), {
-      version: 1,
+      version: 2,
       classes: {},
     });
     assert.deepEqual(await readFile(path.join(root, 'rules.json'), 'utf8').then(JSON.parse), {
-      version: 1,
+      version: 2,
       rules: {},
     });
     assert.equal(await readFile(path.join(root, 'events.jsonl'), 'utf8'), '');
@@ -77,6 +77,105 @@ test('recordAsked creates a class and increments an existing one', async () => {
     });
     assert.equal(store.listClasses().length, 2);
     assert.equal(store.snapshot().totals.requests, 3);
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
+test('recordAsked stores command-risk metadata and v2 fields', async () => {
+  const { root, store } = await makeStore();
+  try {
+    await store.init();
+    const shell = {
+      key: 'bash:sandbox:workspace-write',
+      titleZh: 'Bash：工作区写入',
+      titleEn: 'Bash: workspace write',
+      operation: 'execute',
+      risk: { level: 'high', reasonZh: '高风险', reasonEn: 'high risk', policyId: 'shell' },
+      autoApprove: false,
+    };
+    const asked = await store.recordAsked({
+      classDef: shell,
+      sessionId: 's1',
+      approvalId: 'a1',
+      time: 100,
+      riskTags: ['delete-recursive', 'secret-access'],
+      riskLevelHint: 'high',
+      commandHash: 'abc1234567890def',
+      commandPreview: 'rm -rf .ssh',
+      commandCwd: 'C:\\work',
+      commandTargets: ['.ssh'],
+      truncated: false,
+    });
+    assert.equal(asked.ok, true);
+    assert.deepEqual(asked.class.riskTags, { 'delete-recursive': 1, 'secret-access': 1 });
+    assert.deepEqual(asked.class.commandExamples, ['rm -rf .ssh']);
+    assert.equal(asked.class.riskLevelHint, 'high');
+
+    const event = store.recentEvents(10).find((row) => row.type === 'asked');
+    assert.deepEqual(event.riskTags, ['delete-recursive', 'secret-access']);
+    assert.equal(event.commandHash, 'abc1234567890def');
+    assert.equal(event.commandPreview, 'rm -rf .ssh');
+    assert.equal(event.commandCwd, 'C:\\work');
+    assert.deepEqual(event.commandTargets, ['.ssh']);
+    assert.equal(event.truncated, false);
+
+    await store.recordDecided({
+      classKey: shell.key,
+      sessionId: 's1',
+      approvalId: 'a1',
+      time: 110,
+      outcome: 'rejected',
+      commandHash: 'abc1234567890def',
+    });
+    const decided = store.recentEvents(10).find((row) => row.type === 'decided');
+    assert.equal(decided.commandHash, 'abc1234567890def');
+
+    const doc = JSON.parse(await readFile(path.join(root, 'classes.json'), 'utf8'));
+    assert.equal(doc.version, 2);
+    assert.deepEqual(doc.classes[shell.key].riskTags, { 'delete-recursive': 1, 'secret-access': 1 });
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
+test('v1 store files load and upgrade without losing counts', async () => {
+  const { root, store } = await makeStore();
+  try {
+    await writeFile(path.join(root, 'classes.json'), `${JSON.stringify({
+      version: 1,
+      classes: {
+        'plugin_manager:list_bundles': {
+          key: 'plugin_manager:list_bundles',
+          titleZh: '旧类',
+          titleEn: 'old class',
+          operation: 'read',
+          risk: { level: 'low' },
+          counts: { total: 2, allowed: 1, rejected: 0, auto: 1, cancelledOrUnavailable: 0 },
+          firstSeenAt: 1,
+          lastSeenAt: 2,
+          examples: ['old'],
+        },
+      },
+    }, null, 2)}\n`, 'utf8');
+    await writeFile(path.join(root, 'rules.json'), '{"version":1,"rules":{}}\n', 'utf8');
+    const result = await store.init();
+    assert.equal(result.ok, true);
+    const old = store.getClass('plugin_manager:list_bundles');
+    assert.equal(old.counts.total, 2);
+    assert.deepEqual(old.riskTags, {});
+    assert.deepEqual(old.commandExamples, []);
+    assert.equal(old.riskLevelHint, 'unknown');
+
+    await store.recordAsked({
+      classDef: pm('list_bundles'),
+      sessionId: 's2',
+      approvalId: 'a2',
+      time: 3,
+    });
+    const doc = JSON.parse(await readFile(path.join(root, 'classes.json'), 'utf8'));
+    assert.equal(doc.version, 2);
+    assert.equal(doc.classes['plugin_manager:list_bundles'].counts.total, 3);
   } finally {
     await cleanup(root, store);
   }

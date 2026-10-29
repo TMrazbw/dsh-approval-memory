@@ -16,6 +16,11 @@ selected read-only classes.
   `bash:sandbox:danger-full-access`.
 - Shows request name, operation, actual count, split count, possible risk, and last seen time.
 - Per-class switch for low-risk read-only classes.
+- Collapsible **statistics-only** section for observed classes that cannot be auto-approved;
+  it shows command previews, risk tags, targets, and cwd. Blacklisted classes stay out of it.
+- Repeated-rejection hint for the latest command hash, queried from retained audit events
+  (no fixed 30-day window; the retained window may be shorter).
+- Approximate auto-approval outcomes (ok / error / no-result) from `tool/result` events.
 - Read-only blacklist for classes that must never be auto-approved.
 - Audit log of auto-approved requests.
 - Sidebar panel, `/dam-ui` command, and the `open_dam_ui` agent tool for natural-language opening.
@@ -121,8 +126,8 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **107 tests**, covering classification, extraction, redaction, storage,
-Host runtime, data bridge, Client registration, and integration flows.
+Current test suite: **126 tests**, covering classification, extraction, redaction, storage,
+Host runtime, data bridge, Client registration, command-risk parsing, result tracking, and integration flows.
 
 ```text
 index.js            Host entry
@@ -130,13 +135,14 @@ client.js           Client entry: panel, sidebar, /dam-ui, open_dam_ui tool view
 lib/
   classes.js        request class catalog
   blacklist.js      permanent deny list
-  extract.js        callId/tool-call and reason extraction
+  extract.js        callId/tool-call, command/cwd, and reason extraction
   format.js         counts, time, redaction
-  store.js          file-backed persistence
+  store.js          file-backed persistence (v2 risk metadata)
   host.js           approval runtime
   open-tool.js      plain ToolDefinition for open_dam_ui
   bridge.js         authenticated snapshot/mutate routes
-test/               107 Node tests
+  command-risk.js   pure command-risk heuristics (recorded; UI pending)
+test/               126 Node tests
 locale/             en / zh display metadata
 ```
 

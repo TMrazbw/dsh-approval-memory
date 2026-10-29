@@ -27,6 +27,14 @@ function decided(id, outcome, time = 110) {
   return { type: 'approval/decided', time, data: { id, outcome } };
 }
 
+function toolResult(callId, isError, time = 120) {
+  return {
+    type: 'tool/result',
+    time,
+    data: { message: { toolCallId: callId, isError } },
+  };
+}
+
 function session(id, events) {
   return { id, snapshotEvents: () => events };
 }
@@ -82,6 +90,49 @@ test('asked + decided update the human allow split', async () => {
   }
 });
 
+test('a shell approval stores command risk without changing auto-approval', async () => {
+  const { root, store, runtime } = await makeRuntime();
+  try {
+    const command = 'rm -rf .ssh';
+    const askedEvent = asked('a1', 'bash', {
+      callId: 'c1',
+      reason: 'escalate sandbox to workspace-write: need shell access',
+    });
+    const events = [
+      toolCall('c1', 'bash', JSON.stringify({
+        sandbox_permissions: 'workspace-write',
+        command,
+        cwd: 'C:\\work',
+      })),
+      askedEvent,
+    ];
+    const s = session('s1', events);
+    await runtime.onSessionEvent(s, askedEvent);
+
+    const entry = store.getClass('bash:sandbox:workspace-write');
+    assert.equal(entry.counts.total, 1);
+    assert.deepEqual(entry.riskTags, { 'delete-recursive': 1, 'secret-access': 1 });
+    assert.equal(entry.riskLevelHint, 'high');
+    assert.deepEqual(entry.commandExamples, [command]);
+
+    const askedRow = store.recentEvents(10).find((event) => event.type === 'asked');
+    assert.equal(askedRow.commandHash.length, 16);
+    assert.equal(askedRow.commandPreview, command);
+    assert.equal(askedRow.commandCwd, 'C:\\work');
+    assert.deepEqual(askedRow.commandTargets, ['.ssh']);
+    assert.equal(askedRow.truncated, false);
+
+    await runtime.onSessionEvent(s, decided('a1', 'rejected'));
+    const decidedRow = store.recentEvents(10).find((event) => event.type === 'decided');
+    assert.equal(decidedRow.commandHash, askedRow.commandHash);
+
+    const snapshotRow = store.snapshot().classes.find((row) => row.key === 'bash:sandbox:workspace-write');
+    assert.deepEqual(snapshotRow.rejection, { count: 1, lastRejectedAt: 110 });
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
 test('a default-on read-only class is auto-approved once and counted as auto', async () => {
   const { root, store, runtime } = await makeRuntime();
   try {
@@ -111,6 +162,47 @@ test('a default-on read-only class is auto-approved once and counted as auto', a
     assert.equal(entry.counts.total, 1);
     assert.equal(entry.counts.allowed, 0);
     assert.equal(entry.counts.auto, 1);
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
+test('auto-approved tool results are counted success/error and deduped', async () => {
+  const { root, store, runtime } = await makeRuntime();
+  try {
+    const asked1 = asked('a1', 'plugin_manager', { callId: 'c1', reason: 'list bundles' });
+    const asked2 = asked('a2', 'plugin_manager', { callId: 'c2', reason: 'list bundles' });
+    const events = [
+      toolCall('c1', 'plugin_manager', '{"action":"list_bundles"}'),
+      toolCall('c2', 'plugin_manager', '{"action":"list_bundles"}'),
+      asked1,
+      asked2,
+    ];
+    const s = session('s1', events);
+    await runtime.onSessionEvent(s, asked1);
+    await runtime.onSessionEvent(s, asked2);
+
+    for (const callId of ['c1', 'c2']) {
+      const outcome = await runtime.onApprovalRequest({
+        agent: { session: s },
+        toolName: 'plugin_manager',
+        callId,
+        reason: 'list bundles',
+      }, async () => 'rejected');
+      assert.equal(outcome, 'allowed-once');
+    }
+
+    await runtime.onSessionEvent(s, decided('a1', 'allowed-once'));
+    await runtime.onSessionEvent(s, decided('a2', 'allowed-once'));
+    await runtime.onSessionEvent(s, toolResult('c1', false));
+    await runtime.onSessionEvent(s, toolResult('c1', false));
+    await runtime.onSessionEvent(s, toolResult('c2', true));
+
+    const entry = store.getClass('plugin_manager:list_bundles');
+    assert.equal(entry.counts.auto, 2);
+    assert.deepEqual(entry.autoResults, { success: 1, error: 1 });
+    const autoResultEvents = store.recentEvents(20).filter((event) => event.type === 'auto-result');
+    assert.equal(autoResultEvents.length, 2);
   } finally {
     await cleanup(root, store);
   }
