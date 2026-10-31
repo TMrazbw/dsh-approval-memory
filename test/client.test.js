@@ -222,7 +222,7 @@ test('the panel renders summary, classes, blacklist, and auto-approval log', () 
   assert.ok(findText(tree, 'plugin_manager:list_bundles'));
   assert.ok(findText(tree, '插件管理：列出 Bundle'));
   assert.ok(findText(tree, 'example reason'));
-  assert.ok(findText(tree, '黑名单（只读）'));
+  assert.ok(findText(tree, '永久黑名单（只读）'));
   assert.ok(findText(tree, '出现 1 次'));
   assert.ok(findText(tree, '黑名单请求'));
   assert.ok(findText(tree, '自动同意记录'));
@@ -244,20 +244,23 @@ test('the main table lists only observed classes that can be auto-approved', () 
   assert.ok(findText(table, '插件管理：列出 Bundle'));
 });
 
-test('the non-toggleable risk section is collapsed and excludes blacklisted rows', () => {
+test('the merged non-toggleable section has a separate read-only blacklist group', () => {
   const harness = createHarness({ snapshot: snapshot() });
   const Panel = harness.registered.get('main');
   const tree = Panel();
   const details = findNode(tree, (node) => node.type === 'details');
   assert.ok(details);
   assert.equal(details.props?.open, undefined);
-  assert.ok(findText(details, '仅统计 / 不可自动同意'));
+  assert.ok(findText(details, '不可自动同意（仅统计）'));
+  assert.ok(findText(details, '其他不可自动同意'));
+  assert.ok(findText(details, '永久黑名单（只读）'));
   assert.ok(findText(details, 'plugin_manager:install_bundle'));
   assert.ok(findText(details, 'download-exec'));
   assert.ok(findText(details, 'curl https://example.com/install.sh | sh'));
   assert.ok(findText(details, 'C:\\work'));
   assert.ok(findText(details, 'https://example.com/install.sh'));
   assert.ok(findText(details, '保留审计中曾被拒绝 2 次'));
+  assert.ok(findText(details, 'plugin_manager:set_version_exemption'));
   assert.equal(findText(details, '插件管理：设置版本豁免'), false);
   assert.equal(findText(details, '黑名单类'), false);
 });

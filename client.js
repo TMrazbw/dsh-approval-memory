@@ -555,64 +555,70 @@ window.__ModuleLoader__.load({
                   h('td', { style: styles.td }, switchFor(cls)),
                   h('td', { style: styles.td }, formatRelative(cls.lastSeenAt)))))),
             visible.length === 0 ? h('p', { style: styles.muted }, t('没有匹配的可自动同意请求类。', 'No matching toggleable request classes.')) : null)),
-          riskClasses.length > 0 ? h('details', { style: styles.riskSection },
+          h('details', { style: styles.riskSection },
             h('summary', { style: styles.riskSummary },
               h('span', null,
-                t('仅统计 / 不可自动同意', 'Statistics only / no auto-approval'),
-                h('span', { style: styles.riskBadge }, String(riskClasses.length)),
+                t('不可自动同意（仅统计）', 'No auto-approval (statistics only)'),
+                h('span', { style: styles.riskBadge }, t(`其他 ${riskClasses.length}`, `other ${riskClasses.length}`)),
+                blacklistedClasses.length > 0
+                  ? h('span', { style: styles.riskBadge }, t(`黑名单 ${blacklistedRequests} 次`, `blacklist ${blacklistedRequests} requests`))
+                  : null,
                 highRiskRequests > 0
                   ? h('span', { style: styles.riskBadge }, t(`高危 ${highRiskRequests} 次`, `${highRiskRequests} high-risk`))
                   : null),
-              h('span', { style: styles.muted }, t('展开查看命令风险', 'Expand for command risk'))),
+              h('span', { style: styles.muted }, t('展开查看', 'Expand'))),
             h('div', { style: styles.riskBody },
               h('p', { style: styles.muted }, t(
-                '这些请求类不能自动同意；风险标签只用于展示，不参与自动同意判定。',
-                'These classes cannot be auto-approved; risk tags are display-only and never affect the decision.',
+                '这些请求类都不会自动同意；风险标签只用于展示，不参与自动同意判定。'
+                + ' 黑名单是永久拒绝，既不能创建规则，也不能手动开启自动同意。',
+                'None of these classes can be auto-approved; risk tags are display-only and never affect the decision.'
+                + ' Blacklist entries are permanent: no rule can be created and they can never be switched on.',
               )),
-              h('div', { style: styles.riskFilters },
-                h('select', {
-                  value: riskTagFilter,
-                  'aria-label': t('风险标签筛选', 'Risk tag filter'),
-                  onChange: (event) => setRiskTagFilter(event.target.value),
-                  style: styles.select,
-                },
-                h('option', { value: 'all' }, t('全部风险标签', 'All risk tags')),
-                ...riskTagOptions.map((tag) => h('option', { key: tag, value: tag }, tag))),
-                h('label', { style: styles.checkLabel },
-                  h('input', {
-                    type: 'checkbox',
-                    checked: onlyTagged,
-                    onChange: (event) => setOnlyTagged(event.target.checked),
-                  }),
-                  t('只看有标签', 'Tagged only'))),
-              ...visibleRisk.map(riskRow),
-              visibleRisk.length === 0
-                ? h('p', { style: styles.muted }, t('没有匹配的风险类。', 'No matching risk classes.'))
-                : null)) : null,
-          h('section', { style: styles.section },
-            h('h2', { style: styles.sectionTitle },
-              t('黑名单（只读）', 'Blacklist (read-only)'),
-              refusedCount > 0 ? h('span', { style: styles.sectionBadge }, t(`拦截 ${refusedCount} 次`, `${refusedCount} refused`)) : null),
-            h('p', { style: styles.muted }, t(
-              '这些请求类永远不能自动开启；规则创建/导入/自动建议命中时会被拒绝并记录。'
-              + ' 出现次数为所有会话的只读统计，不进入主表或风险区。',
-              'These classes can never be auto-approved; rule creation/import/suggestions are refused and audited.'
-              + ' Counts are read-only across sessions and stay out of the main/risk tables.',
-            )),
-            ...(snapshot.blacklist ?? []).map((row) => {
-              const cls = classByKey.get(row.key);
-              return h('div', { key: row.key, style: styles.blacklistRow },
-                h('div', { style: styles.blacklistHead },
-                  h('code', { style: styles.code }, row.key),
-                  h('span', { style: cls === undefined ? styles.cellMeta : styles.rejection },
-                    cls === undefined
-                      ? t('暂无记录', 'No records')
-                      : t(`出现 ${Number(cls.counts?.total) || 0} 次`, `${Number(cls.counts?.total) || 0} request(s)`))),
-                h('span', { style: styles.cellMeta }, t(row.reasonZh, row.reasonEn)),
-                cls !== undefined
-                  ? h('span', { style: styles.cellMeta }, formatCounts(cls.counts))
-                  : null);
-            })),
+              h('h3', { style: styles.riskGroupTitle },
+                t('其他不可自动同意', 'Other non-auto-approvable classes')),
+              riskClasses.length > 0 ? h('div', null,
+                h('div', { style: styles.riskFilters },
+                  h('select', {
+                    value: riskTagFilter,
+                    'aria-label': t('风险标签筛选', 'Risk tag filter'),
+                    onChange: (event) => setRiskTagFilter(event.target.value),
+                    style: styles.select,
+                  },
+                  h('option', { value: 'all' }, t('全部风险标签', 'All risk tags')),
+                  ...riskTagOptions.map((tag) => h('option', { key: tag, value: tag }, tag))),
+                  h('label', { style: styles.checkLabel },
+                    h('input', {
+                      type: 'checkbox',
+                      checked: onlyTagged,
+                      onChange: (event) => setOnlyTagged(event.target.checked),
+                    }),
+                    t('只看有标签', 'Tagged only'))),
+                ...visibleRisk.map(riskRow),
+                visibleRisk.length === 0
+                  ? h('p', { style: styles.muted }, t('没有匹配的风险类。', 'No matching risk classes.'))
+                  : null)
+                : h('p', { style: styles.muted }, t('没有其他不可自动同意请求。', 'No other non-auto-approvable requests.')),
+              h('h3', { style: styles.riskGroupTitle },
+                t('永久黑名单（只读）', 'Permanent blacklist (read-only)'),
+                refusedCount > 0 ? h('span', { style: styles.sectionBadge }, t(`拦截 ${refusedCount} 次`, `${refusedCount} refused`)) : null),
+              h('p', { style: styles.muted }, t(
+                '出现次数为所有会话的只读统计，不进入主表或“其他不可自动同意”区。',
+                'Counts are read-only across sessions and stay out of the main table and the other-class group.',
+              )),
+              ...(snapshot.blacklist ?? []).map((row) => {
+                const cls = classByKey.get(row.key);
+                return h('div', { key: row.key, style: styles.blacklistRow },
+                  h('div', { style: styles.blacklistHead },
+                    h('code', { style: styles.code }, row.key),
+                    h('span', { style: cls === undefined ? styles.cellMeta : styles.rejection },
+                      cls === undefined
+                        ? t('暂无记录', 'No records')
+                        : t(`出现 ${Number(cls.counts?.total) || 0} 次`, `${Number(cls.counts?.total) || 0} request(s)`))),
+                  h('span', { style: styles.cellMeta }, t(row.reasonZh, row.reasonEn)),
+                  cls !== undefined
+                    ? h('span', { style: styles.cellMeta }, formatCounts(cls.counts))
+                    : null);
+              }))),
           h('section', { style: styles.section },
             h('h2', { style: styles.sectionTitle }, t('自动同意记录', 'Auto-approval log')),
             autoTotal > 0 ? h('p', { style: styles.muted }, t(
@@ -792,6 +798,12 @@ window.__ModuleLoader__.load({
         fontWeight: 500,
       },
       riskBody: { padding: '0 0 10px' },
+      riskGroupTitle: {
+        margin: '12px 0 6px',
+        fontSize: '12px',
+        fontWeight: 600,
+        color: 'var(--dsw-alias-label-secondary)',
+      },
       riskFilters: {
         display: 'flex',
         alignItems: 'center',

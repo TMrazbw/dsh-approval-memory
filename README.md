@@ -16,13 +16,12 @@ selected read-only classes.
   `bash:sandbox:danger-full-access`.
 - Shows request name, operation, actual count, split count, possible risk, and last seen time.
 - Per-class switch for low-risk read-only classes.
-- Collapsible **statistics-only** section for observed classes that cannot be auto-approved;
-  it shows command previews, risk tags, targets, and cwd. Blacklisted classes stay out of it.
+- One collapsible **no auto-approval (statistics only)** section with two groups:
+  - other observed classes that cannot be toggled (command preview, risk tags, targets, cwd);
+  - permanent blacklist (read-only counts, no switch, no rule creation).
 - Repeated-rejection hint for the latest command hash, queried from retained audit events
   (no fixed 30-day window; the retained window may be shorter).
 - Approximate auto-approval outcomes (ok / error / no-result) from `tool/result` events.
-- Read-only blacklist for classes that must never be auto-approved; observed counts are shown
-  in the blacklist section and a top-level summary, without exposing toggle/risk rows.
 - Audit log of auto-approved requests.
 - Sidebar panel, `/dam-ui` command, and the `open_dam_ui` agent tool for natural-language opening.
 - Panel loads when opened; manual refresh is available.
