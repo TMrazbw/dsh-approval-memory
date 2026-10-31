@@ -244,6 +244,64 @@ test('the main table lists only observed classes that can be auto-approved', () 
   assert.ok(findText(table, '插件管理：列出 Bundle'));
 });
 
+test('the main table shows auto-approved counts and sorts by frequency', () => {
+  const snap = snapshot();
+  snap.classes = [
+    ...snap.classes,
+    {
+      key: 'plugin_manager:list_plugins',
+      titleZh: '插件管理：列出已安装插件',
+      titleEn: 'Plugin Manager: list plugins',
+      operation: 'read',
+      risk: { level: 'low', reasonZh: '只读', reasonEn: 'read-only', policyId: 'p' },
+      counts: { total: 10, allowed: 6, rejected: 0, auto: 4, cancelledOrUnavailable: 0 },
+      firstSeenAt: 1,
+      lastSeenAt: 2,
+      examples: [],
+    },
+    {
+      key: 'plugin_manager:list_version_exemptions',
+      titleZh: '插件管理：列出版本豁免',
+      titleEn: 'Plugin Manager: list version exemptions',
+      operation: 'read',
+      risk: { level: 'low', reasonZh: '只读', reasonEn: 'read-only', policyId: 'p' },
+      counts: { total: 5, allowed: 3, rejected: 0, auto: 2, cancelledOrUnavailable: 0 },
+      firstSeenAt: 1,
+      lastSeenAt: 2,
+      examples: [],
+    },
+  ];
+  snap.totals = { classes: snap.classes.length, requests: 18, auto: 7 };
+
+  const harness = createHarness({ snapshot: snap });
+  const Panel = harness.registered.get('main');
+  const tree = Panel();
+  const table = findNode(tree, (node) => node.type === 'table');
+  assert.ok(table);
+  assert.ok(findText(table, '自动同意次数'));
+  assert.equal(findText(table, '实际次数'), false);
+
+  const rows = [];
+  (function walk(node) {
+    if (node === null || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child);
+      return;
+    }
+    if (node.type === 'tr') rows.push(node);
+    walk(node.children);
+  }(table));
+  const keys = ['plugin_manager:list_plugins', 'plugin_manager:list_version_exemptions', 'plugin_manager:list_bundles'];
+  const order = rows
+    .map((row) => keys.find((key) => findText(row, key)))
+    .filter((key) => key !== undefined);
+  assert.deepEqual(order, [
+    'plugin_manager:list_plugins',
+    'plugin_manager:list_version_exemptions',
+    'plugin_manager:list_bundles',
+  ]);
+});
+
 test('the merged non-toggleable section has a separate read-only blacklist group', () => {
   const harness = createHarness({ snapshot: snapshot() });
   const Panel = harness.registered.get('main');

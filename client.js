@@ -284,8 +284,24 @@ window.__ModuleLoader__.load({
         return cls.risk?.level === 'low' && !blacklistKeys.has(cls.key);
       }
 
-      const toggleableClasses = classes.filter((cls) => canToggle(cls));
+      const byFrequency = (left, right) => (
+        (Number(right.counts?.total) || 0) - (Number(left.counts?.total) || 0)
+        || (Number(right.lastSeenAt) || 0) - (Number(left.lastSeenAt) || 0)
+      );
+      const sortedClasses = [...classes].sort(byFrequency);
+      const toggleableClasses = sortedClasses.filter((cls) => canToggle(cls));
       const statsOnlyCount = classes.length - toggleableClasses.length;
+      const classByKey = new Map(sortedClasses.map((cls) => [cls.key, cls]));
+      const riskClasses = sortedClasses.filter((cls) => !canToggle(cls) && !blacklistKeys.has(cls.key));
+      const blacklistedClasses = sortedClasses.filter((cls) => blacklistKeys.has(cls.key));
+      const blacklistedRequests = blacklistedClasses.reduce(
+        (sum, cls) => sum + (Number(cls.counts?.total) || 0),
+        0,
+      );
+      const blacklistRows = [...(snapshot?.blacklist ?? [])].sort((left, right) => (
+        (Number(classByKey.get(right.key)?.counts?.total) || 0)
+        - (Number(classByKey.get(left.key)?.counts?.total) || 0)
+      ));
       const operations = [...new Set(toggleableClasses.map((cls) => cls.operation))]
         .filter((value) => typeof value === 'string')
         .sort();
@@ -299,13 +315,6 @@ window.__ModuleLoader__.load({
         return true;
       });
 
-      const riskClasses = classes.filter((cls) => !canToggle(cls) && !blacklistKeys.has(cls.key));
-      const classByKey = new Map(classes.map((cls) => [cls.key, cls]));
-      const blacklistedClasses = classes.filter((cls) => blacklistKeys.has(cls.key));
-      const blacklistedRequests = blacklistedClasses.reduce(
-        (sum, cls) => sum + (Number(cls.counts?.total) || 0),
-        0,
-      );
       const riskTagOptions = [...new Set(riskClasses.flatMap((cls) => Object.keys(cls.riskTags ?? {})))]
         .sort();
       const visibleRisk = riskClasses.filter((cls) => {
@@ -533,7 +542,7 @@ window.__ModuleLoader__.load({
             h('div', { style: styles.tableScroll },
               h('table', { style: styles.table },
                 h('thead', null, h('tr', null,
-                  ...[t('可同意请求类', 'Toggleable class'), t('操作', 'Operation'), t('实际次数', 'Actual count'),
+                  ...[t('可同意请求类', 'Toggleable class'), t('操作', 'Operation'), t('自动同意次数', 'Auto-approved count'),
                     t('风险', 'Risk'), t('自动同意', 'Auto-approve'), t('最近出现', 'Last seen')]
                     .map((label) => h('th', { key: label, style: styles.th }, label)))),
                 h('tbody', null, ...visible.map((cls) => h('tr', { key: cls.key },
@@ -547,7 +556,7 @@ window.__ModuleLoader__.load({
                     }, example)),
                     rejectionText(cls) ? h('div', { style: styles.rejection }, rejectionText(cls)) : null),
                   h('td', { style: styles.td }, operationLabel(cls.operation)),
-                  h('td', { style: styles.td }, formatCounts(cls.counts)),
+                  h('td', { style: styles.td }, String(Number(cls.counts?.auto) || 0)),
                   h('td', { style: styles.td },
                     h('span', { style: { color: riskColor(cls.risk?.level), fontWeight: 500 } },
                       riskLabel(cls.risk?.level)),
@@ -605,7 +614,7 @@ window.__ModuleLoader__.load({
                 '出现次数为所有会话的只读统计，不进入主表或“其他不可自动同意”区。',
                 'Counts are read-only across sessions and stay out of the main table and the other-class group.',
               )),
-              ...(snapshot.blacklist ?? []).map((row) => {
+              ...blacklistRows.map((row) => {
                 const cls = classByKey.get(row.key);
                 return h('div', { key: row.key, style: styles.blacklistRow },
                   h('div', { style: styles.blacklistHead },

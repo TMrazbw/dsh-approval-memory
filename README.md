@@ -14,7 +14,8 @@ selected read-only classes.
 - Collects `approval/asked` / `approval/decided` from every session in the current profile.
 - Groups requests into stable classes such as `plugin_manager:list_bundles` and
   `bash:sandbox:danger-full-access`.
-- Shows request name, operation, actual count, split count, possible risk, and last seen time.
+- Shows request name, operation, count, risk, and last seen time; statistics are sorted by
+  observed frequency, with the main table showing the auto-approved count.
 - Per-class switch for low-risk read-only classes.
 - One collapsible **no auto-approval (statistics only)** section with two groups:
   - other observed classes that cannot be toggled (command preview, risk tags, targets, cwd);
@@ -126,7 +127,7 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **126 tests**, covering classification, extraction, redaction, storage,
+Current test suite: **127 tests**, covering classification, extraction, redaction, storage,
 Host runtime, data bridge, Client registration, command-risk parsing, result tracking, and integration flows.
 
 ```text
@@ -142,7 +143,7 @@ lib/
   open-tool.js      plain ToolDefinition for open_dam_ui
   bridge.js         authenticated snapshot/mutate routes
   command-risk.js   pure command-risk heuristics (recorded; UI pending)
-test/               126 Node tests
+test/               127 Node tests
 locale/             en / zh display metadata
 ```
 
