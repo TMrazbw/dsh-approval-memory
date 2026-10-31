@@ -153,6 +153,16 @@ test('extractRequest returns shell command and cwd', () => {
   assert.equal(request.commandSource, 'tool_call');
 });
 
+test('extractRequest returns a structured file path', () => {
+  const events = [{
+    type: 'tool/call',
+    data: { callId: 'call-read', name: 'read', arguments: '{"path":"C:\\\\work\\\\a.txt"}' },
+  }];
+  const request = extractRequest({ toolName: 'read', callId: 'call-read', events });
+  assert.equal(request.path, 'C:\\work\\a.txt');
+  assert.equal(request.command, null);
+});
+
 test('extractRequest returns empty fields when nothing can be resolved', () => {
   const request = extractRequest({ toolName: 'unknown', callId: null, reason: null, events: [] });
   assert.equal(request.source, 'none');

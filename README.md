@@ -17,6 +17,11 @@ selected read-only classes.
 - Shows request name, operation, count, risk, and last seen time; statistics are sorted by
   observed frequency, with the main table showing the auto-approved count.
 - Per-class switch for low-risk read-only classes.
+- Path trust, scoped to the current conversation and cleared on restart:
+  - non-sensitive `read` requests are auto-approved;
+  - sensitive paths stay manual, then a once-approved exact path is trusted for that session;
+  - a manual `write`/`edit` approval trusts exactly that file for that session;
+  - no parent/directory inheritance, no shell trust.
 - One collapsible **no auto-approval (statistics only)** section with two groups:
   - other observed classes that cannot be toggled (command preview, risk tags, targets, cwd);
   - permanent blacklist (read-only counts, no switch, no rule creation).
@@ -127,8 +132,9 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **127 tests**, covering classification, extraction, redaction, storage,
-Host runtime, data bridge, Client registration, command-risk parsing, result tracking, and integration flows.
+Current test suite: **134 tests**, covering classification, extraction, redaction, storage,
+Host runtime, data bridge, Client registration, command-risk parsing, path trust, result tracking,
+and integration flows.
 
 ```text
 index.js            Host entry
@@ -142,8 +148,9 @@ lib/
   host.js           approval runtime
   open-tool.js      plain ToolDefinition for open_dam_ui
   bridge.js         authenticated snapshot/mutate routes
-  command-risk.js   pure command-risk heuristics (recorded; UI pending)
-test/               127 Node tests
+  command-risk.js   pure command-risk heuristics (recorded and displayed)
+  path-trust.js     session path normalization and sensitive-path checks
+test/               134 Node tests
 locale/             en / zh display metadata
 ```
 

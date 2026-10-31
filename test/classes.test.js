@@ -140,6 +140,15 @@ test('class key never includes callId or reason text', () => {
   assert.equal(def.key.includes('justification'), false);
 });
 
+test('read is a low-risk auto-approvable class', () => {
+  const def = classifyRequest({ toolName: 'read' });
+  assert.equal(def.key, 'read:file');
+  assert.equal(def.operation, 'read');
+  assert.equal(def.risk.level, 'low');
+  assert.equal(def.autoApprove, true);
+  assert.equal(isAutoApprovable(def), true);
+});
+
 test('static catalog includes plugin_manager and sandbox classes', () => {
   const classes = listKnownClasses();
   assert.ok(classes.length >= 17);

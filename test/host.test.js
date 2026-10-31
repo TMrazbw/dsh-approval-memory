@@ -208,6 +208,145 @@ test('auto-approved tool results are counted success/error and deduped', async (
   }
 });
 
+test('normal reads auto-approve, sensitive reads need one session trust', async () => {
+  const { root, store, runtime } = await makeRuntime();
+  try {
+    const normal = path.join(tmpdir(), 'dam-read-normal.txt');
+    const sensitive = path.join(tmpdir(), '.ssh', 'id_rsa');
+    const events = [];
+    const s = session('s1', events);
+
+    const normalAsk = asked('r1', 'read', { callId: 'rc1' });
+    events.push(toolCall('rc1', 'read', JSON.stringify({ path: normal })), normalAsk);
+    await runtime.onSessionEvent(s, normalAsk);
+    let next = 0;
+    const normalOutcome = await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'read', callId: 'rc1',
+    }, async () => {
+      next += 1;
+      return 'rejected';
+    });
+    assert.equal(normalOutcome, 'allowed-once');
+    assert.equal(next, 0);
+
+    const sensitiveAsk = asked('r2', 'read', { callId: 'rc2' });
+    events.push(toolCall('rc2', 'read', JSON.stringify({ path: sensitive })), sensitiveAsk);
+    await runtime.onSessionEvent(s, sensitiveAsk);
+    let manual = 0;
+    const manualOutcome = await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'read', callId: 'rc2',
+    }, async () => {
+      manual += 1;
+      return 'allowed-once';
+    });
+    assert.equal(manualOutcome, 'allowed-once');
+    assert.equal(manual, 1);
+    await runtime.onSessionEvent(s, decided('r2', 'allowed-once'));
+
+    const trustedAsk = asked('r3', 'read', { callId: 'rc3' });
+    events.push(toolCall('rc3', 'read', JSON.stringify({ path: sensitive })), trustedAsk);
+    await runtime.onSessionEvent(s, trustedAsk);
+    let trustedNext = 0;
+    const trustedOutcome = await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'read', callId: 'rc3',
+    }, async () => {
+      trustedNext += 1;
+      return 'rejected';
+    });
+    assert.equal(trustedOutcome, 'allowed-once');
+    assert.equal(trustedNext, 0);
+
+    const otherEvents = [];
+    const other = session('s2', otherEvents);
+    const otherAsk = asked('r4', 'read', { callId: 'rc4' });
+    otherEvents.push(toolCall('rc4', 'read', JSON.stringify({ path: sensitive })), otherAsk);
+    await runtime.onSessionEvent(other, otherAsk);
+    let otherNext = 0;
+    await runtime.onApprovalRequest({
+      agent: { session: other }, toolName: 'read', callId: 'rc4',
+    }, async () => {
+      otherNext += 1;
+      return 'rejected';
+    });
+    assert.equal(otherNext, 1);
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
+test('write trust is exact-file and session-scoped; shell is never path-trusted', async () => {
+  const { root, store, runtime } = await makeRuntime();
+  try {
+    const fileA = path.join(tmpdir(), 'dam-write-a.txt');
+    const fileB = path.join(tmpdir(), 'dam-write-b.txt');
+    const events = [];
+    const s = session('s1', events);
+
+    const firstAsk = asked('w1', 'write', { callId: 'wc1' });
+    events.push(toolCall('wc1', 'write', JSON.stringify({
+      path: fileA, sandbox_permissions: 'danger-full-access',
+    })), firstAsk);
+    await runtime.onSessionEvent(s, firstAsk);
+    let firstNext = 0;
+    const firstOutcome = await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'write', callId: 'wc1',
+    }, async () => {
+      firstNext += 1;
+      return 'allowed-once';
+    });
+    assert.equal(firstOutcome, 'allowed-once');
+    assert.equal(firstNext, 1);
+    await runtime.onSessionEvent(s, decided('w1', 'allowed-once'));
+
+    const secondAsk = asked('w2', 'write', { callId: 'wc2' });
+    events.push(toolCall('wc2', 'write', JSON.stringify({
+      path: fileA, sandbox_permissions: 'danger-full-access',
+    })), secondAsk);
+    await runtime.onSessionEvent(s, secondAsk);
+    let secondNext = 0;
+    const secondOutcome = await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'write', callId: 'wc2',
+    }, async () => {
+      secondNext += 1;
+      return 'rejected';
+    });
+    assert.equal(secondOutcome, 'allowed-once');
+    assert.equal(secondNext, 0);
+
+    const thirdAsk = asked('w3', 'write', { callId: 'wc3' });
+    events.push(toolCall('wc3', 'write', JSON.stringify({
+      path: fileB, sandbox_permissions: 'danger-full-access',
+    })), thirdAsk);
+    await runtime.onSessionEvent(s, thirdAsk);
+    let thirdNext = 0;
+    await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'write', callId: 'wc3',
+    }, async () => {
+      thirdNext += 1;
+      return 'rejected';
+    });
+    assert.equal(thirdNext, 1);
+
+    const shellAsk = asked('sh1', 'pwsh', { callId: 'shc1' });
+    events.push(toolCall('shc1', 'pwsh', JSON.stringify({
+      command: 'Set-Content C:\\tmp\\x.txt hi',
+      path: fileA,
+      sandbox_permissions: 'danger-full-access',
+    })), shellAsk);
+    await runtime.onSessionEvent(s, shellAsk);
+    let shellNext = 0;
+    await runtime.onApprovalRequest({
+      agent: { session: s }, toolName: 'pwsh', callId: 'shc1',
+    }, async () => {
+      shellNext += 1;
+      return 'rejected';
+    });
+    assert.equal(shellNext, 1);
+  } finally {
+    await cleanup(root, store);
+  }
+});
+
 test('never policy delegates even for a default-on class', async () => {
   const { root, store } = await makeRuntime();
   try {
