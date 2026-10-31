@@ -300,6 +300,12 @@ window.__ModuleLoader__.load({
       });
 
       const riskClasses = classes.filter((cls) => !canToggle(cls) && !blacklistKeys.has(cls.key));
+      const classByKey = new Map(classes.map((cls) => [cls.key, cls]));
+      const blacklistedClasses = classes.filter((cls) => blacklistKeys.has(cls.key));
+      const blacklistedRequests = blacklistedClasses.reduce(
+        (sum, cls) => sum + (Number(cls.counts?.total) || 0),
+        0,
+      );
       const riskTagOptions = [...new Set(riskClasses.flatMap((cls) => Object.keys(cls.riskTags ?? {})))]
         .sort();
       const visibleRisk = riskClasses.filter((cls) => {
@@ -478,7 +484,8 @@ window.__ModuleLoader__.load({
             card(t('请求总数', 'Requests'), String(snapshot.totals?.requests ?? 0)),
             card(t('自动同意', 'Auto-approved'), String(snapshot.totals?.auto ?? 0)),
             card(t('可同意请求类', 'Toggleable classes'), String(toggleableClasses.length)),
-            card(t('生效规则', 'Active rules'), String(activeRules))),
+            card(t('生效规则', 'Active rules'), String(activeRules)),
+            card(t('黑名单请求', 'Blacklisted requests'), String(blacklistedRequests))),
           highRiskRequests > 0 ? h('p', { style: styles.muted }, t(
             `含高危模式的请求 ${highRiskRequests} 次（仅统计，不参与自动同意）。`,
             `${highRiskRequests} request(s) with high-risk patterns (statistics only, never auto-approved).`,
@@ -587,12 +594,25 @@ window.__ModuleLoader__.load({
               t('黑名单（只读）', 'Blacklist (read-only)'),
               refusedCount > 0 ? h('span', { style: styles.sectionBadge }, t(`拦截 ${refusedCount} 次`, `${refusedCount} refused`)) : null),
             h('p', { style: styles.muted }, t(
-              '这些请求类永远不能自动开启；规则创建/导入/自动建议命中时会被拒绝并记录。',
-              'These classes can never be auto-approved; rule creation/import/suggestions are refused and audited.',
+              '这些请求类永远不能自动开启；规则创建/导入/自动建议命中时会被拒绝并记录。'
+              + ' 出现次数为所有会话的只读统计，不进入主表或风险区。',
+              'These classes can never be auto-approved; rule creation/import/suggestions are refused and audited.'
+              + ' Counts are read-only across sessions and stay out of the main/risk tables.',
             )),
-            ...(snapshot.blacklist ?? []).map((row) => h('div', { key: row.key, style: styles.blacklistRow },
-              h('code', { style: styles.code }, row.key),
-              h('span', { style: styles.cellMeta }, t(row.reasonZh, row.reasonEn))))),
+            ...(snapshot.blacklist ?? []).map((row) => {
+              const cls = classByKey.get(row.key);
+              return h('div', { key: row.key, style: styles.blacklistRow },
+                h('div', { style: styles.blacklistHead },
+                  h('code', { style: styles.code }, row.key),
+                  h('span', { style: cls === undefined ? styles.cellMeta : styles.rejection },
+                    cls === undefined
+                      ? t('暂无记录', 'No records')
+                      : t(`出现 ${Number(cls.counts?.total) || 0} 次`, `${Number(cls.counts?.total) || 0} request(s)`))),
+                h('span', { style: styles.cellMeta }, t(row.reasonZh, row.reasonEn)),
+                cls !== undefined
+                  ? h('span', { style: styles.cellMeta }, formatCounts(cls.counts))
+                  : null);
+            })),
           h('section', { style: styles.section },
             h('h2', { style: styles.sectionTitle }, t('自动同意记录', 'Auto-approval log')),
             autoTotal > 0 ? h('p', { style: styles.muted }, t(
@@ -824,6 +844,13 @@ window.__ModuleLoader__.load({
         color: 'var(--dsw-alias-state-warn-primary)',
         fontSize: '11px',
         fontWeight: 400,
+      },
+      blacklistHead: {
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: '8px',
+        flexWrap: 'wrap',
       },
       blacklistRow: { display: 'flex', flexDirection: 'column', gap: '2px', padding: '6px 0', borderBottom: '1px solid var(--dsw-alias-border-l1)' },
       auditRow: { display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'baseline', padding: '5px 0', borderBottom: '1px solid var(--dsw-alias-border-l1)', fontSize: '12px' },

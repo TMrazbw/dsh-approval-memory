@@ -223,6 +223,8 @@ test('the panel renders summary, classes, blacklist, and auto-approval log', () 
   assert.ok(findText(tree, '插件管理：列出 Bundle'));
   assert.ok(findText(tree, 'example reason'));
   assert.ok(findText(tree, '黑名单（只读）'));
+  assert.ok(findText(tree, '出现 1 次'));
+  assert.ok(findText(tree, '黑名单请求'));
   assert.ok(findText(tree, '自动同意记录'));
   assert.ok(findText(tree, '自动同意结果（近似）：成功 1 / 失败 0 / 未执行 0'));
   assert.ok(findText(tree, 'C:/dam-data'));

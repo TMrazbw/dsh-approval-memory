@@ -21,7 +21,8 @@ selected read-only classes.
 - Repeated-rejection hint for the latest command hash, queried from retained audit events
   (no fixed 30-day window; the retained window may be shorter).
 - Approximate auto-approval outcomes (ok / error / no-result) from `tool/result` events.
-- Read-only blacklist for classes that must never be auto-approved.
+- Read-only blacklist for classes that must never be auto-approved; observed counts are shown
+  in the blacklist section and a top-level summary, without exposing toggle/risk rows.
 - Audit log of auto-approved requests.
 - Sidebar panel, `/dam-ui` command, and the `open_dam_ui` agent tool for natural-language opening.
 - Panel loads when opened; manual refresh is available.
