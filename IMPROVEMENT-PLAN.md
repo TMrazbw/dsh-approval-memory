@@ -1,7 +1,7 @@
 # DAM 改造计划（2026-11-03）
 
 > 依据：项目根目录的 `DSH-Agent效率与防错改造说明.md`
-> 范围：仅 DAM（dsh-approval-memory）；不包含 DFL / DSK / GATE 代码。
+> 范围：DAM（dsh-approval-memory）自身；GATE 已作为独立项目 `dsh-danger-gate` 实现，不在本计划的代码范围内。
 > 当前基线：139 项测试，GitHub `6833760`；第一步、第二步已完成。
 
 ## 1. 结论
@@ -11,7 +11,7 @@
 1. **不可逆动作标签**（P1-1）——做；
 2. 更新 DAM 测试基线 107 → 139——做；
 3. Ship/合并审批归档（P2-2）——不做（无素材、低价值）；
-4. GATE 联动——**契约已定义，DAM 侧护栏已实现**；GATE 插件本身仍不做；
+4. GATE 联动——**契约已定义，DAM 侧护栏已实现**；GATE 已作为独立项目 `dsh-danger-gate` 0.1.0 实现；
 5. 路径信任与 GATE 的优先级——**已保证**：GATE ask 不会被 DAM 自动同意绕过。
 
 ## 2. 不可逆动作标签（第一步）
@@ -77,7 +77,7 @@
 
 ### 3.3 仍不做
 
-- 不实现 GATE 插件、规则表、`block` 或 GATE 自身审计；
+- DAM 不实现 GATE 插件、规则表、`block` 或 GATE 自身审计；这些在独立项目 `dsh-danger-gate` 中实现；
 - GATE `block` 不产生审批，DAM 不记录（除非将来另定审计通道）；
 - 不把 GATE 规则塞进 DAM。
 
@@ -91,7 +91,7 @@
 - 不让 DAM 做命令阻断；
 - 不让不可逆标签参与自动同意；
 - 不擅自放开 shell 黑名单；
-- 不实现 GATE 代码。
+- DAM 不实现 GATE 代码；GATE 在独立项目 `dsh-danger-gate` 中实现。
 
 ## 6. 完成标准
 
