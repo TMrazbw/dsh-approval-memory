@@ -1,7 +1,7 @@
 # GATE ask contract
 
-> Status: **defined** (DAM 0.3.0). `dsh-danger-gate` itself is not implemented yet.
-> Scope: only the hand-off between GATE and DAM; it does not add GATE rules or blocking.
+> Status: **defined** (DAM 0.3.x; GATE 0.1.0 implemented).
+> Scope: only the hand-off between GATE and DAM; it does not add DAM rules or blocking.
 
 ## Decision
 
@@ -27,13 +27,17 @@ Example:
 return {
   kind: 'ask',
   reason: `GATE-ASK:recursive-delete ${summary}`,
-  displayReason: `GATE-ASK:递归删除 ${localizedSummary}`,
+  displayReason: {
+    en: `GATE detected a risky shell command. Allow this one call? ${summary}`,
+    zh: `GATE 检测到高风险 shell 命令。是否允许这一次调用？${summary}`,
+  },
 };
 ```
 
-The text after the marker may contain spaces or a localized display copy; the
-marker itself is ASCII and never localized. A space after the colon is
-recommended but not required.
+The text after the marker may contain spaces. The marker itself is ASCII and
+never localized. A space after the colon is recommended but not required.
+`displayReason` is optional localized UI copy and is not used for detection;
+`approval/asked` does not log it.
 
 ## GATE obligations
 
@@ -41,8 +45,9 @@ recommended but not required.
    `block`; those do not create an approval request.
 2. Set `reason` to a string that starts with `GATE-ASK:`. Do not put the marker
    later in the string and do not add leading whitespace.
-3. If `displayReason` is supplied, it must also start with `GATE-ASK:` so the
-   approval UI and the audit view agree.
+3. `displayReason` may be a localized object (`{ en, zh, ... }`) or a string.
+   It is UI copy only: it need not contain the marker, because detection and
+   audit use `reason`.
 4. Emit one `ask` per tool call. Do not retry the same ask in a loop.
 5. Keep the rule id stable. The human explanation may change; the prefix must
    not.
@@ -56,8 +61,9 @@ recommended but not required.
 `lib/gate.js` exposes:
 
 - `GATE_ASK_PREFIX` — the exact reserved prefix;
-- `isGateAsk(request)` — true when `reason` or `displayReason` starts with the
-  prefix.
+- `isGateAsk(request)` — true when `reason`, or a string `displayReason`,
+  starts with the prefix. A localized object `displayReason` is not inspected;
+  GATE's `reason` carries the marker.
 
 When `isGateAsk` is true, `lib/host.js` returns `next()` before any class-rule,
 path-trust, or auto-approval logic. DAM still observes the normal
@@ -82,8 +88,9 @@ Consequences:
 - `callId` is assigned by the tools pipeline, not by GATE.
 - `reason` is the only GATE-controlled string that reaches both DAM's
   `approval/request` listener and the durable `approval/asked` audit event.
-- `displayReason` can be localized, but `approval/asked` does not log it, so it
-  cannot be the sole marker.
+- `displayReason` can be localized and is not logged by `approval/asked`, so it
+  cannot be the sole marker. GATE 0.1.0 sends `{ en, zh }`; detection uses
+  `reason`.
 
 ## Limits
 
