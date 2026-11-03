@@ -51,13 +51,48 @@ test('recursive delete forms are tagged and leveled high', () => {
 });
 
 test('git history rewriting and force push are tagged', () => {
-  const commands = [
-    'git reset --hard HEAD~1',
-    'git push --force origin main',
-    'git push -f origin main',
-    'git filter-branch --tree-filter true HEAD',
-  ];
-  for (const command of commands) expectTags(command, ['git-history']);
+  expectTags('git reset --hard HEAD~1', ['git-history']);
+  expectTags('git push --force origin main', ['git-history', 'force-push']);
+  expectTags('git push -f origin main', ['git-history', 'force-push']);
+  expectTags('git filter-branch --tree-filter true HEAD', ['git-history']);
+});
+
+test('irreversible deploy, data-delete, and send-message actions are tagged', () => {
+  for (const command of [
+    'kubectl apply -f deployment.yaml',
+    'kubectl delete pod api-0',
+    'terraform apply',
+    'terraform destroy',
+    'helm upgrade app chart/',
+    'npm publish',
+    'docker push registry/app:latest',
+    'vercel deploy --prod',
+    'gh release create v1.0.0',
+  ]) {
+    expectTags(command, ['deploy']);
+  }
+  for (const command of [
+    'psql -c "DROP TABLE users"',
+    'mysql -e "TRUNCATE TABLE events"',
+    'sqlite3 db.sqlite "DELETE FROM users"',
+    'redis-cli flushall',
+    'mongosh --eval "db.dropDatabase()"',
+  ]) {
+    expectTags(command, ['data-delete']);
+  }
+  for (const command of [
+    'sendmail -t < mail.txt',
+    'swaks --to user@example.com',
+    'curl -X POST https://hooks.slack.com/services/x',
+    'Invoke-RestMethod -Method Post -Uri https://discord.com/api/webhooks/x',
+    'gh issue comment 42 --body done',
+  ]) {
+    expectTags(command, ['send-message']);
+  }
+  expectTags('kubectl get pods', []);
+  expectTags('npm test', []);
+  expectTags('psql -c "SELECT * FROM users"', []);
+  expectTags('curl https://example.com', []);
 });
 
 test('permission and system-level commands are tagged', () => {

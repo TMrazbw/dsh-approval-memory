@@ -5,6 +5,7 @@ groups them into request classes, shows counts and possible risk, and lets the u
 selected read-only classes.
 
 - **DAM = DSH Approval Memory**
+- Version: `0.2.0`
 - No DSH core changes
 - No custom session event types
 - One-shot grants only: auto-approval still returns `allowed-once`
@@ -16,6 +17,8 @@ selected read-only classes.
   `bash:sandbox:danger-full-access`.
 - Shows request name, operation, count, risk, and last seen time; statistics are sorted by
   observed frequency, with the main table showing the auto-approved count.
+- Irreversible-action tags for display/audit only: `force-push`, `deploy`, `data-delete`,
+  `send-message`; they never affect auto-approval.
 - Per-class switch for low-risk read-only classes.
 - Path trust, scoped to the current conversation and cleared on restart:
   - non-sensitive `read` requests are auto-approved;
@@ -132,7 +135,7 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **134 tests**, covering classification, extraction, redaction, storage,
+Current test suite: **135 tests**, covering classification, extraction, redaction, storage,
 Host runtime, data bridge, Client registration, command-risk parsing, path trust, result tracking,
 and integration flows.
 
@@ -150,7 +153,7 @@ lib/
   bridge.js         authenticated snapshot/mutate routes
   command-risk.js   pure command-risk heuristics (recorded and displayed)
   path-trust.js     session path normalization and sensitive-path checks
-test/               134 Node tests
+test/               135 Node tests
 locale/             en / zh display metadata
 ```
 
