@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-approval-memory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "DAM: records and classifies DSH approval requests, shows counts and risk, and auto-approves user-enabled read-only request classes.",

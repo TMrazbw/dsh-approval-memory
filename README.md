@@ -5,7 +5,7 @@ groups them into request classes, shows counts and possible risk, and lets the u
 selected read-only classes.
 
 - **DAM = DSH Approval Memory**
-- Version: `0.2.0`
+- Version: `0.3.0`
 - No DSH core changes
 - No custom session event types
 - One-shot grants only: auto-approval still returns `allowed-once`
@@ -19,6 +19,8 @@ selected read-only classes.
   observed frequency, with the main table showing the auto-approved count.
 - Irreversible-action tags for display/audit only: `force-push`, `deploy`, `data-delete`,
   `send-message`; they never affect auto-approval.
+- GATE asks (`GATE-ASK:` marker) are never auto-approved, even when a class rule or a
+  Session path trust would otherwise allow them. See [GATE-CONTRACT.md](./GATE-CONTRACT.md).
 - Per-class switch for low-risk read-only classes.
 - Path trust, scoped to the current conversation and cleared on restart:
   - non-sensitive `read` requests are auto-approved;
@@ -96,6 +98,15 @@ Everything else is conservative:
 
 Risk labels are static inferences, not a security guarantee.
 
+## GATE integration
+
+DAM does not implement GATE. When the separate `dsh-danger-gate` plugin asks
+from `tools/pre-execute`, it must start the approval `reason` with `GATE-ASK:`.
+DAM recognizes that prefix and delegates to the human answerer, so a class rule
+or a Session path trust cannot silently bypass the gate. The marker, GATE
+obligations, and failure modes are defined in
+[GATE-CONTRACT.md](./GATE-CONTRACT.md).
+
 ## Scope
 
 - Applies to **all sessions in the current DSH profile** where the plugin is installed.
@@ -124,6 +135,8 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 - Repeating a request does not automatically create a rule.
 - A request class with any rejection can be reviewed; V1 never treats repetition as consent.
 - The blacklist is code-owned and cannot be removed through the UI/API.
+- A request whose `reason` starts with `GATE-ASK:` is always delegated to the human
+  answerer; a forged marker only forces extra review and cannot bypass the answerer.
 - The `open_dam_ui` tool only opens the panel; it never changes rules.
 - The panel uses authenticated `connection.fetch` routes:
   - `GET /api/approval-memory.snapshot`
@@ -135,9 +148,9 @@ Environment override: `DSH_APPROVAL_MEMORY_ROOT`.
 node --test --test-isolation=none
 ```
 
-Current test suite: **135 tests**, covering classification, extraction, redaction, storage,
-Host runtime, data bridge, Client registration, command-risk parsing, path trust, result tracking,
-and integration flows.
+Current test suite: **139 tests**, covering classification, extraction, redaction, storage,
+Host runtime, GATE marker handling, data bridge, Client registration, command-risk parsing,
+path trust, result tracking, and integration flows.
 
 ```text
 index.js            Host entry
@@ -153,7 +166,8 @@ lib/
   bridge.js         authenticated snapshot/mutate routes
   command-risk.js   pure command-risk heuristics (recorded and displayed)
   path-trust.js     session path normalization and sensitive-path checks
-test/               135 Node tests
+  gate.js           GATE ask marker detection (never auto-approved)
+test/               139 Node tests
 locale/             en / zh display metadata
 ```
 
