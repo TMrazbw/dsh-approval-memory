@@ -167,10 +167,10 @@ test('a default-on read-only class is auto-approved once and counted as auto', a
   }
 });
 
-test('GATE asks are never auto-approved even when the class rule is on', async () => {
+test('GATE asks are never auto-approved and use a gate class', async () => {
   const { root, store, runtime } = await makeRuntime();
   try {
-    const gateReason = 'GATE-ASK: recursive-delete matched rm -rf';
+    const gateReason = 'GATE-ASK:recursive-delete matched rm -rf';
     const askedEvent = asked('a1', 'plugin_manager', {
       callId: 'c1',
       reason: gateReason,
@@ -178,6 +178,10 @@ test('GATE asks are never auto-approved even when the class rule is on', async (
     const events = [toolCall('c1', 'plugin_manager', '{"action":"list_bundles"}'), askedEvent];
     const s = session('s1', events);
     await runtime.onSessionEvent(s, askedEvent);
+
+    const askedRow = store.recentEvents(20).find((event) => event.type === 'asked');
+    assert.equal(askedRow.source, 'gate');
+    assert.equal(askedRow.reason, gateReason);
 
     let nextCalls = 0;
     const outcome = await runtime.onApprovalRequest({
@@ -193,7 +197,7 @@ test('GATE asks are never auto-approved even when the class rule is on', async (
     assert.equal(nextCalls, 1);
 
     await runtime.onSessionEvent(s, decided('a1', 'allowed-once'));
-    const entry = store.getClass('plugin_manager:list_bundles');
+    const entry = store.getClass('gate:recursive-delete');
     assert.equal(entry.counts.total, 1);
     assert.equal(entry.counts.allowed, 1);
     assert.equal(entry.counts.auto, 0);
@@ -223,7 +227,7 @@ test('GATE asks bypass Session path trust', async () => {
     assert.equal(manualNext, 1);
     await runtime.onSessionEvent(s, decided('r1', 'allowed-once'));
 
-    const gateReason = 'GATE-ASK: secret-access matched .ssh';
+    const gateReason = 'GATE-ASK:secret-access matched .ssh';
     const gateAsk = asked('r2', 'read', { callId: 'rc2', reason: gateReason });
     events.push(toolCall('rc2', 'read', JSON.stringify({ path: sensitive })), gateAsk);
     await runtime.onSessionEvent(s, gateAsk);

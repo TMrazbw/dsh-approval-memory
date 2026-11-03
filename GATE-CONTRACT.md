@@ -67,8 +67,10 @@ never localized. A space after the colon is recommended but not required.
 
 When `isGateAsk` is true, `lib/host.js` returns `next()` before any class-rule,
 path-trust, or auto-approval logic. DAM still observes the normal
-`approval/asked` / `approval/decided` pair, classifies the request, records
-counts, and audits the human outcome. No new session event type is created.
+`approval/asked` / `approval/decided` pair, classifies the ask as the high-risk
+`gate:<rule>` class (for example `gate:recursive-delete`), records `source:
+gate`, keeps the `reason` in the audit event, counts the human outcome, and
+never marks it `auto`. No new session event type is created.
 
 Consequences:
 
