@@ -6,7 +6,6 @@ import {
   isAutoApprovable,
   listKnownClasses,
 } from '../lib/classes.js';
-import { GATE_ASK_PREFIX } from '../lib/gate.js';
 
 test('classifies list_bundles as a low-risk read-only class', () => {
   const def = classifyRequest({ toolName: 'plugin_manager', action: 'list_bundles' });
@@ -106,45 +105,7 @@ test('missing sandbox mode becomes an unknown, non-approvable class', () => {
   assert.equal(def.autoApprove, false);
 });
 
-test('GATE asks are classified as gate:<rule>, not as sandbox escalation', () => {
-  const def = classifyRequest({
-    toolName: 'pwsh',
-    reason: `${GATE_ASK_PREFIX}recursive-delete Remove-Item -Recurse -Force .\\dist`,
-  });
-  assert.equal(def.key, 'gate:recursive-delete');
-  assert.equal(def.operation, 'execute');
-  assert.equal(def.risk.level, 'high');
-  assert.equal(def.escalation, false);
-  assert.equal(def.known, false);
-  assert.equal(def.autoApprove, false);
-  assert.equal(isAutoApprovable(def), false);
-  assert.match(def.titleZh, /危险命令闸门：递归删除/);
-});
-
-test('a multi-rule GATE ask uses the primary rule for its key', () => {
-  const def = classifyRequest({
-    toolName: 'bash',
-    reason: `${GATE_ASK_PREFIX}recursive-delete+sensitive-target rm -rf ~/.ssh`,
-  });
-  assert.equal(def.key, 'gate:recursive-delete');
-});
-
-test('an unknown GATE rule stays a gate class', () => {
-  const future = classifyRequest({
-    toolName: 'pwsh',
-    reason: `${GATE_ASK_PREFIX}future-rule do something`,
-  });
-  assert.equal(future.key, 'gate:future-rule');
-  assert.equal(future.autoApprove, false);
-  const empty = classifyRequest({
-    toolName: 'pwsh',
-    reason: GATE_ASK_PREFIX,
-  });
-  assert.equal(empty.key, 'gate:unknown');
-  assert.equal(empty.autoApprove, false);
-});
-
-test('a normal pwsh ask without the marker is still sandbox unknown', () => {
+test('a normal pwsh ask without a sandbox mode is sandbox unknown', () => {
   const def = classifyRequest({ toolName: 'pwsh', reason: 'normal approval' });
   assert.equal(def.key, 'pwsh:sandbox:unknown');
   assert.equal(def.operation, 'execute');

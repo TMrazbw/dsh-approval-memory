@@ -116,24 +116,6 @@
   默认不自动；人工允许一次后，同一会话的同一精确路径才自动；
 - `pwsh` / `bash` 不参与路径信任。
 
-## 3.2 GATE ask 类
-
-GATE 的审批请求不再归入 `pwsh:sandbox:unknown`，而是使用独立的动态类：
-
-| 类键 | 标题 | 操作 | 危险性 | V1 状态 |
-|---|---|---|---|---|
-| `gate:recursive-delete` | 危险命令闸门：递归删除 | 执行 | 高 | ❌ 仅统计 |
-| `gate:history-rewrite` | 危险命令闸门：历史或远程改写 | 执行 | 高 | ❌ 仅统计 |
-| `gate:system-device` | 危险命令闸门：系统或设备操作 | 执行 | 高 | ❌ 仅统计 |
-| `gate:download-exec` | 危险命令闸门：下载后执行 | 执行 | 高 | ❌ 仅统计 |
-| `gate:sensitive-target` | 危险命令闸门：敏感目标 | 执行 | 高 | ❌ 仅统计 |
-| `gate:unknown` | 危险命令闸门：未分类规则 | 执行 | 高 | ❌ 仅统计 |
-
-- 识别依据：`reason` 以 `GATE-ASK:` 开头；
-- 多规则命中时，类键取主规则（第一个）；
-- 不是沙箱升级，不参与路径信任，永不自动同意；
-- `approval/asked` 审计事件的 `source` 为 `gate`，`reason` 保留 `GATE-ASK:` 文本。
-
 ---
 
 ## 4. V1 默认开关
